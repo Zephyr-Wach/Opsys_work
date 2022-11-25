@@ -1,31 +1,110 @@
 package Armmove_alg;
 
+import java.util.HashMap;
+import java.util.Set;
+import java.util.concurrent.locks.LockSupport;
+
 public class alg_SCAN {
+    public int direction = 1;     // 1:up  -1:down
+    public static void main(String[] args) {
+        Creator creator = new Creator();
+        HashMap<Thread, Integer> hm = creator.create();
+        int requireNum = hm.size();
+        Disk disk = new Disk();
+        alg_SCAN s = new alg_SCAN();
+        int n = s.scan(hm, disk);
+        disk.set(requireNum, n);
+    }
 
-    static void scan(int n,int io[]){
-        int start;  //起始磁道号
-        int m=300;//最大磁道数
 
-        start=io[0];
-        int arr[]=new int[m];
-        int j;
-        for(j=0;j<n;j++){
-            arr[j]=io[j];
+    public int scan(HashMap<Thread, Integer> hm, Disk disk) {
+        System.out.println("----------------");
+        System.out.println("SCAN算法调度序列:");
+        System.out.println("磁头初始在100位置");
+        int[] count = new int[200];
+        this.require(hm, count);
+        int n = this.release(hm, count, disk);
+        return n;
+    }
+
+    public int release(HashMap<Thread, Integer> hm, int[] count, Disk disk) {
+        int n = 0;
+        if(this.direction == 1) {
+            n += this.upscan(hm, count, disk);
+            n += this.downscan(hm, count, disk);
         }
-        int len = arr.length;
-        for (int i = 0; i < len - 1; i++) {
-            for (j = 0; j < len - 1 - i; j++) {
-                if (arr[j] > arr[j+1]) {
-                    int temp = arr[j+1];
-                    arr[j+1] = arr[j];
-                    arr[j] = temp;
+        else if(this.direction == -1){
+            n += this.downscan(hm, count, disk);
+            n += this.upscan(hm, count, disk);
+        }
+        return n;
+    }
+
+    public void require(HashMap<Thread, Integer> hm, int[] count) {
+        Set<Thread> keys = hm.keySet();
+        for(Thread key: keys) {
+            count[hm.get(key)] += 1;
+        }
+    }
+
+    public int downscan(HashMap<Thread, Integer> hm, int[] count, Disk disk) {
+        int i = disk.getCurrentDist(), num = 0, absNum = 0;
+        Thread removeKey = null;
+        while(i >= 0) {
+            while(i >= 0 && count[i] == 0) {
+                i -= 1;
+                absNum += 1;
+            }
+            if(i >= 0) {
+                num += absNum;
+                absNum = 0;
+                count[i] -= 1;
+                Set<Thread> keys = hm.keySet();
+                for(Thread key: keys) {
+                    if(hm.get(key) == i) {
+                        System.out.println(key.getName() + " -- " + hm.get(key));
+                        removeKey = key;
+                        LockSupport.unpark(key);
+                    }
                 }
+                hm.remove(removeKey);
+                disk.setCurrentDist(i);
+                i = disk.getCurrentDist();
             }
         }
-        int i=0;
-        int temp=arr[i];
-        for(;temp!=start;i++){}
-        for(j=i;j>=0;j--){System.out.printf("\n",arr[j]);}
-        for(j=i;j<n;j++){System.out.printf("\n",arr[j]);}
+        this.direction = 1;
+        return num;
     }
+
+    public int upscan(HashMap<Thread, Integer> hm, int[] count, Disk disk) {
+        int i = disk.getCurrentDist(), num = 0, absNum = 0;
+        Thread removeKey = null;
+        while(i <= 199) {
+            while(i <= 199 && count[i] == 0) {
+                i += 1;
+                absNum += 1;
+            }
+            if(i <= 199) {
+                num += absNum;
+                absNum = 0;
+                count[i] -= 1;
+
+                Set<Thread> keys = hm.keySet();
+                for(Thread key: keys) {
+                    if(hm.get(key) == i) {
+                        System.out.println(key.getName() + " -- " + hm.get(key));
+//						hm.remove(key);   //  错误做法
+                        removeKey = key;
+                        LockSupport.unpark(key);
+                    }
+                }
+                hm.remove(removeKey);
+                disk.setCurrentDist(i);
+                i = disk.getCurrentDist();
+            }
+        }
+        this.direction = -1;
+        return num;
+    }
+
 }
