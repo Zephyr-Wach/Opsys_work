@@ -8,9 +8,7 @@ public class alg_CSCAN extends Disk {
         this.start = start;
     }
 
-    // 执行此次扫描算法的调动方法
     public void run() {
-        //调用父类的分类方法
         separate();
         // diskList接收排序好的顺序
         diskList = sort(diskListBefore, false);
